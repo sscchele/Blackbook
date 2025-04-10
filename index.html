@@ -1,0 +1,1671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vocabulary Master</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #4e73df;
+            --secondary-color: #f8f9fc;
+            --accent-color: #2e59d9;
+            --text-color: #5a5c69;
+            --flashcard-front: #f8f9fc;
+            --flashcard-back: #e9ecef;
+            --flashcard-text: #212529;
+        }
+        
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #f8f9fa;
+            color: var(--text-color);
+        }
+        
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid var(--primary-color);
+        }
+        
+        .card {
+            border-radius: 0.5rem;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            margin-bottom: 1.5rem;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        /* Flashcard styling */
+        .flashcard-container {
+            perspective: 1000px;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .flashcard {
+            width: 100%;
+            aspect-ratio: 4/3;
+            transform-style: preserve-3d;
+            transition: transform 0.6s;
+            position: relative;
+        }
+        
+        .flashcard.flipped {
+            transform: rotateY(180deg);
+        }
+        
+        .flashcard-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        
+        .flashcard-front {
+            background-color: var(--flashcard-front);
+            color: var(--flashcard-text);
+        }
+        
+        .flashcard-back {
+            background-color: var(--flashcard-back);
+            color: var (--flashcard-text);
+            transform: rotateY(180deg);
+        }
+        
+        .word-display {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .meaning-display {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .synonym-antonym-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .synonym-item {
+            background-color: #d4edda;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        .antonym-item {
+            background-color: #f8d7da;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        /* Quiz styling */
+        .quiz-option {
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .quiz-option:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .quiz-option.correct {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        
+        .quiz-option.incorrect {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        
+        /* Matching game */
+        .matching-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .matching-column {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .matching-item {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .matching-item:hover {
+            background-color: #f0f0f0;
+        }
+        
+        .matching-item.selected {
+            background-color: #cce5ff;
+            border-color: #b8daff;
+        }
+        
+        .matching-item.matched {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+            cursor: default;
+        }
+        
+        /* List view */
+        .word-list-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            transition: all 0.3s;
+        }
+        
+        .word-list-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .word-list-item .word {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .word-list-item .details {
+            display: none;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .word-list-item.expanded .details {
+            display: block;
+        }
+        
+        /* Marked button */
+        .btn-mark {
+            color: #6c757d;
+            border: none;
+            background: none;
+            font-size: 1.5rem;
+        }
+        
+        .btn-mark.marked {
+            color: #ffc107;
+        }
+        
+        /* Filter controls */
+        .filter-section {
+            background-color: white;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">Vocabulary Master</h1>
+        
+        <ul class="nav nav-tabs mb-4" id="vocabTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="add-tab" data-bs-toggle="tab" data-bs-target="#add" type="button" role="tab">Add Words</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="review-tab" data-bs-toggle="tab" data-bs-target="#review" type="button" role="tab">Review</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="test-tab" data-bs-toggle="tab" data-bs-target="#test" type="button" role="tab">Test</button>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="vocabTabsContent">
+            <!-- Add Words Tab -->
+            <div class="tab-pane fade show active" id="add" role="tabpanel">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Add Word Manually</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="manualWordForm">
+                                    <div class="mb-3">
+                                        <label for="word" class="form-label">Word*</label>
+                                        <input type="text" class="form-control" id="word" required>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="meaning" class="form-label">Meaning</label>
+                                        <textarea class="form-control" id="meaning" rows="2"></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="synonyms" class="form-label">Synonyms (comma separated)</label>
+                                        <input type="text" class="form-control" id="synonyms">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="antonyms" class="form-label">Antonyms (comma separated)</label>
+                                        <input type="text" class="form-control" id="antonyms">
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="sentence" class="form-label">Example Sentence</label>
+                                        <textarea class="form-control" id="sentence" rows="2"></textarea>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="wrongOptions" class="form-label">Wrong Options for Quiz (comma separated, min 3)</label>
+                                        <input type="text" class="form-control" id="wrongOptions">
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Add Word</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0">Import Words via JSON</h5>
+                            </div>
+                            <div class="card-body">
+                                <form id="jsonWordForm">
+                                    <div class="mb-3">
+                                        <label for="jsonData" class="form-label">JSON Data*</label>
+                                        <textarea class="form-control" id="jsonData" rows="12" required></textarea>
+                                        <small class="text-muted">Format: {"word": "", "meaning": "", "synonyms": [], "antonyms": [], "sentence": "", "wrongOptions": []}</small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">Import Words</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Review Tab -->
+            <div class="tab-pane fade" id="review" role="tabpanel">
+                <div class="filter-section">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="reviewMode" class="form-label">Review Mode</label>
+                            <select class="form-select" id="reviewMode">
+                                <option value="list">List View</option>
+                                <option value="flashcard">Flashcards</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="timeFilter" class="form-label">Time Filter</label>
+                            <select class="form-select" id="timeFilter">
+                                <option value="all">All Words</option>
+                                <option value="today">Today</option>
+                                <option value="yesterday">Yesterday</option>
+                                <option value="this_week">This Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="most_wrong">Most Wrong</option>
+                                <option value="marked">Marked Words</option>
+                                <option value="random">Random Selection</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3" id="randomOptionsContainer" style="display: none;">
+                            <label for="randomOptions" class="form-label">Random Options</label>
+                            <select class="form-select" id="randomOptions">
+                                <option value="10">10 Words</option>
+                                <option value="20">20 Words</option>
+                                <option value="30">30 Words</option>
+                                <option value="yesterday">Yesterday's Words</option>
+                                <option value="2days">2 Days Ago</option>
+                                <option value="3days">3 Days Ago</option>
+                                <option value="5days">5 Days Ago</option>
+                                <option value="7days">7 Days Ago</option>
+                                <option value="15days">15 Days Ago</option>
+                                <option value="30days">30 Days Ago</option>
+                                <option value="60days">60 Days Ago</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="searchWord" class="form-label">Search Word</label>
+                            <input type="text" class="form-control" id="searchWord" placeholder="Enter word to search">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="sortOrder" class="form-label">Sort Order</label>
+                            <select class="form-select" id="sortOrder">
+                                <option value="random">Random</option>
+                                <option value="alphabetical">A-Z</option>
+                                <option value="reverse">Z-A</option>
+                                <option value="newest">Newest First</option>
+                                <option value="oldest">Oldest First</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3 mb-3 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" id="applyFilters">Apply Filters</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="listViewContainer">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Word List</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="wordList">
+                                <!-- Word list will be populated here -->
+                                <div class="text-center py-5">
+                                    <p>No words to display. Apply filters or add words first.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="flashcardViewContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Flashcards</h5>
+                            <div>
+                                <button class="btn btn-sm btn-light me-2" id="prevCard">
+                                    <i class="fas fa-arrow-left"></i>
+                                </button>
+                                <span id="flashcardCounter">0/0</span>
+                                <button class="btn btn-sm btn-light ms-2" id="nextCard">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="flashcard-container">
+                                <div class="flashcard" id="flashcard">
+                                    <div class="flashcard-face flashcard-front">
+                                        <div class="word-display" id="flashcardFrontContent"></div>
+                                    </div>
+                                    <div class="flashcard-face flashcard-back">
+                                        <div id="flashcardBackContent"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-center mt-4">
+                                <button class="btn btn-primary me-2" id="flipCard">Flip Card</button>
+                                <button class="btn btn-mark" id="markCard" title="Mark this word">
+                                    <i class="far fa-star"></i>
+                                </button>
+                            </div>
+                            <div class="d-flex justify-content-center mt-3">
+                                <button class="btn btn-outline-secondary me-2" id="showWordFirst">Word First</button>
+                                <button class="btn btn-outline-secondary me-2" id="showMeaningFirst">Meaning First</button>
+                                <button class="btn btn-outline-secondary" id="shuffleFlashcards">Shuffle</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Test Tab -->
+            <div class="tab-pane fade" id="test" role="tabpanel">
+                <div class="filter-section">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="testType" class="form-label">Test Type</label>
+                            <select class="form-select" id="testType">
+                                <option value="meaning">Word Meaning</option>
+                                <option value="synonyms">Synonyms</option>
+                                <option value="matching">Matching Game</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="testTimeFilter" class="form-label">Time Filter</label>
+                            <select class="form-select" id="testTimeFilter">
+                                <option value="all">All Words</option>
+                                <option value="today">Today</option>
+                                <option value="yesterday">Yesterday</option>
+                                <option value="this_week">This Week</option>
+                                <option value="last_week">Last Week</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="most_wrong">Most Wrong</option>
+                                <option value="marked">Marked Words</option>
+                                <option value="random">Random Selection</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3" id="testRandomOptionsContainer" style="display: none;">
+                            <label for="testRandomOptions" class="form-label">Random Options</label>
+                            <select class="form-select" id="testRandomOptions">
+                                <option value="10">10 Words</option>
+                                <option value="20">20 Words</option>
+                                <option value="30">30 Words</option>
+                                <option value="yesterday">Yesterday's Words</option>
+                                <option value="2days">2 Days Ago</option>
+                                <option value="3days">3 Days Ago</option>
+                                <option value="5days">5 Days Ago</option>
+                                <option value="7days">7 Days Ago</option>
+                                <option value="15days">15 Days Ago</option>
+                                <option value="30days">30 Days Ago</option>
+                                <option value="60days">60 Days Ago</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="testQuestionCount" class="form-label">Number of Questions</label>
+                            <input type="number" class="form-control" id="testQuestionCount" min="1" value="10">
+                        </div>
+                        <div class="col-md-6 mb-3 d-flex align-items-end">
+                            <button class="btn btn-primary w-100" id="startTest">Start Test</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="meaningTestContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Word Meaning Test</h5>
+                            <div>
+                                <span id="testProgress">0/0</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h4 class="mb-4" id="meaningQuestion"></h4>
+                            <div id="meaningOptions">
+                                <!-- Options will be populated here -->
+                            </div>
+                            <div class="mt-4" id="meaningFeedback" style="display: none;">
+                                <p id="correctAnswerFeedback"></p>
+                                <button class="btn btn-primary mt-2" id="nextMeaningQuestion">Next Question</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="synonymTestContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Synonyms Test</h5>
+                            <div>
+                                <span id="synonymTestProgress">0/0</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <h4 class="mb-4" id="synonymQuestion"></h4>
+                            <div id="synonymOptions">
+                                <!-- Options will be populated here -->
+                            </div>
+                            <div class="mt-4" id="synonymFeedback" style="display: none;">
+                                <p id="synonymAnswerFeedback"></p>
+                                <button class="btn btn-primary mt-2" id="nextSynonymQuestion">Next Question</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="matchingTestContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Matching Game</h5>
+                            <div>
+                                <span id="matchingProgress">0 pairs matched</span>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div class="matching-container">
+                                <div class="matching-column" id="matchingColumn1">
+                                    <!-- Words will be populated here -->
+                                </div>
+                                <div class="matching-column" id="matchingColumn2">
+                                    <!-- Meanings will be populated here -->
+                                </div>
+                            </div>
+                            <div class="mt-4 text-center">
+                                <button class="btn btn-primary" id="checkMatching" disabled>Check Answers</button>
+                                <button class="btn btn-outline-secondary ms-2" id="nextMatchingGame">Next Game</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="testResultsContainer" style="display: none;">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Test Results</h5>
+                        </div>
+                        <div class="card-body">
+                            <h4 class="mb-3">Your Score: <span id="testScore">0</span>/<span id="totalQuestions">0</span></h4>
+                            <div id="testReview">
+                                <!-- Test review will be populated here -->
+                            </div>
+                            <button class="btn btn-primary mt-3" id="retakeTest">Retake Test</button>
+                            <button class="btn btn-outline-primary mt-3 ms-2" id="newTest">Start New Test</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Firebase Configuration and App Logic -->
+    <script>
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDfc0p67p2ZG1aB5XYgT8WVyU3HzsQ0fO4",
+  authDomain: "vocabspaced.firebaseapp.com",
+  projectId: "vocabspaced",
+  storageBucket: "vocabspaced.firebasestorage.app",
+  messagingSenderId: "625582802046",
+  appId: "1:625582802046:web:bd8a55a39733da0ea6042f"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        // DOM Elements
+        const manualWordForm = document.getElementById('manualWordForm');
+        const jsonWordForm = document.getElementById('jsonWordForm');
+        const reviewModeSelect = document.getElementById('reviewMode');
+        const listViewContainer = document.getElementById('listViewContainer');
+        const flashcardViewContainer = document.getElementById('flashcardViewContainer');
+        const flashcard = document.getElementById('flashcard');
+        const flashcardFrontContent = document.getElementById('flashcardFrontContent');
+        const flashcardBackContent = document.getElementById('flashcardBackContent');
+        const flipCardBtn = document.getElementById('flipCard');
+        const markCardBtn = document.getElementById('markCard');
+        const prevCardBtn = document.getElementById('prevCard');
+        const nextCardBtn = document.getElementById('nextCard');
+        const flashcardCounter = document.getElementById('flashcardCounter');
+        const showWordFirstBtn = document.getElementById('showWordFirst');
+        const showMeaningFirstBtn = document.getElementById('showMeaningFirst');
+        const shuffleFlashcardsBtn = document.getElementById('shuffleFlashcards');
+        const wordList = document.getElementById('wordList');
+        const searchWordInput = document.getElementById('searchWord');
+        const timeFilterSelect = document.getElementById('timeFilter');
+        const randomOptionsContainer = document.getElementById('randomOptionsContainer');
+        const randomOptionsSelect = document.getElementById('randomOptions');
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        
+        // Test elements
+        const testTypeSelect = document.getElementById('testType');
+        const testTimeFilterSelect = document.getElementById('testTimeFilter');
+        const testRandomOptionsContainer = document.getElementById('testRandomOptionsContainer');
+        const testRandomOptionsSelect = document.getElementById('testRandomOptions');
+        const testQuestionCountInput = document.getElementById('testQuestionCount');
+        const startTestBtn = document.getElementById('startTest');
+        const meaningTestContainer = document.getElementById('meaningTestContainer');
+        const synonymTestContainer = document.getElementById('synonymTestContainer');
+        const matchingTestContainer = document.getElementById('matchingTestContainer');
+        const testResultsContainer = document.getElementById('testResultsContainer');
+        
+        // Global variables
+        let words = [];
+        let currentFlashcardIndex = 0;
+        let flashcardMode = 'word'; // 'word' or 'meaning'
+        let filteredWords = [];
+        let testWords = [];
+        let currentTestIndex = 0;
+        let testScore = 0;
+        let testResults = [];
+        let matchingPairs = [];
+        let selectedMatch = null;
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadWords();
+            
+            // Review tab events
+            reviewModeSelect.addEventListener('change', toggleReviewMode);
+            flipCardBtn.addEventListener('click', flipFlashcard);
+            markCardBtn.addEventListener('click', toggleMarkWord);
+            prevCardBtn.addEventListener('click', showPreviousFlashcard);
+            nextCardBtn.addEventListener('click', showNextFlashcard);
+            showWordFirstBtn.addEventListener('click', () => setFlashcardMode('word'));
+            showMeaningFirstBtn.addEventListener('click', () => setFlashcardMode('meaning'));
+            shuffleFlashcardsBtn.addEventListener('click', shuffleFlashcards);
+            timeFilterSelect.addEventListener('change', toggleRandomOptions);
+            applyFiltersBtn.addEventListener('click', applyFilters);
+            searchWordInput.addEventListener('input', filterWordList);
+            
+            // Test tab events
+            testTypeSelect.addEventListener('change', toggleTestType);
+            testTimeFilterSelect.addEventListener('change', toggleTestRandomOptions);
+            startTestBtn.addEventListener('click', startTest);
+            
+            // Form submissions
+            manualWordForm.addEventListener('submit', addManualWord);
+            jsonWordForm.addEventListener('submit', importJsonWords);
+        });
+
+        // Firebase Functions
+        async function loadWords() {
+            try {
+                const snapshot = await db.collection('vocabulary').get();
+                words = snapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        word: data.word,
+                        meaning: data.meaning || '',
+                        synonyms: data.synonyms || [],
+                        antonyms: data.antonyms || [],
+                        sentence: data.sentence || '',
+                        wrongOptions: data.wrongOptions || [],
+                        marked: data.marked || false,
+                        createdAt: data.createdAt || new Date(),
+                        testHistory: data.testHistory || []
+                    };
+                });
+                applyFilters();
+            } catch (error) {
+                console.error('Error loading words:', error);
+                alert('Failed to load words. Please try again.');
+            }
+        }
+
+        async function addWord(wordData) {
+            try {
+                const docRef = await db.collection('vocabulary').add({
+                    ...wordData,
+                    createdAt: new Date(),
+                    marked: false,
+                    testHistory: []
+                });
+                return docRef.id;
+            } catch (error) {
+                console.error('Error adding word:', error);
+                throw error;
+            }
+        }
+
+        async function updateWord(wordId, updates) {
+            try {
+                await db.collection('vocabulary').doc(wordId).update(updates);
+            } catch (error) {
+                console.error('Error updating word:', error);
+                throw error;
+            }
+        }
+
+        // Review Functions
+        function toggleReviewMode() {
+            const mode = reviewModeSelect.value;
+            if (mode === 'list') {
+                listViewContainer.style.display = 'block';
+                flashcardViewContainer.style.display = 'none';
+                renderWordList();
+            } else {
+                listViewContainer.style.display = 'none';
+                flashcardViewContainer.style.display = 'block';
+                renderFlashcard();
+            }
+        }
+
+        function applyFilters() {
+            const filter = timeFilterSelect.value;
+            const sortOrder = document.getElementById('sortOrder').value;
+            
+            // Apply time filter
+            const now = new Date();
+            filteredWords = [...words];
+            
+            if (filter === 'today') {
+                const today = new Date(now.setHours(0, 0, 0, 0));
+                filteredWords = filteredWords.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= today;
+                });
+            } else if (filter === 'yesterday') {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const today = new Date(yesterday);
+                today.setDate(today.getDate() + 1);
+                filteredWords = filteredWords.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= yesterday && wordDate < today;
+                });
+            } else if (filter === 'this_week') {
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+                startOfWeek.setHours(0, 0, 0, 0);
+                filteredWords = filteredWords.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfWeek;
+                });
+            } else if (filter === 'last_week') {
+                const startOfLastWeek = new Date(now);
+                startOfLastWeek.setDate(startOfLastWeek.getDate() - startOfLastWeek.getDay() - 7);
+                startOfLastWeek.setHours(0, 0, 0, 0);
+                const endOfLastWeek = new Date(startOfLastWeek);
+                endOfLastWeek.setDate(endOfLastWeek.getDate() + 7);
+                filteredWords = filteredWords.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfLastWeek && wordDate < endOfLastWeek;
+                });
+            } else if (filter === 'last_month') {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                filteredWords = filteredWords.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfMonth && wordDate < new Date(now.getFullYear(), now.getMonth(), 1);
+                });
+            } else if (filter === 'most_wrong') {
+                filteredWords.sort((a, b) => {
+                    const aWrong = a.testHistory.filter(r => !r.correct).length;
+                    const bWrong = b.testHistory.filter(r => !r.correct).length;
+                    return bWrong - aWrong;
+                });
+            } else if (filter === 'marked') {
+                filteredWords = filteredWords.filter(word => word.marked);
+            } else if (filter === 'random') {
+                const randomOption = randomOptionsSelect.value;
+                if (!isNaN(randomOption)) {
+                    // Number of words selected
+                    shuffleArray(filteredWords);
+                    filteredWords = filteredWords.slice(0, parseInt(randomOption));
+                } else {
+                    // Time period selected
+                    const daysAgo = parseInt(randomOption.replace('days', '')) || 1;
+                    const startDate = new Date(now);
+                    startDate.setDate(startDate.getDate() - daysAgo);
+                    startDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    filteredWords = filteredWords.filter(word => {
+                        const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                        return wordDate >= startDate && wordDate < endDate;
+                    });
+                    shuffleArray(filteredWords);
+                }
+            }
+            
+            // Apply sort order
+            if (sortOrder === 'alphabetical') {
+                filteredWords.sort((a, b) => a.word.localeCompare(b.word));
+            } else if (sortOrder === 'reverse') {
+                filteredWords.sort((a, b) => b.word.localeCompare(a.word));
+            } else if (sortOrder === 'newest') {
+                filteredWords.sort((a, b) => {
+                    const aDate = a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+                    const bDate = b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                    return bDate - aDate;
+                });
+            } else if (sortOrder === 'oldest') {
+                filteredWords.sort((a, b) => {
+                    const aDate = a.createdAt.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+                    const bDate = b.createdAt.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+                    return aDate - bDate;
+                });
+            } else {
+                // Random
+                shuffleArray(filteredWords);
+            }
+            
+            // Apply the current view
+            if (reviewModeSelect.value === 'list') {
+                renderWordList();
+            } else {
+                currentFlashcardIndex = 0;
+                renderFlashcard();
+            }
+        }
+
+        function toggleRandomOptions() {
+            if (timeFilterSelect.value === 'random') {
+                randomOptionsContainer.style.display = 'block';
+            } else {
+                randomOptionsContainer.style.display = 'none';
+            }
+        }
+
+        function filterWordList() {
+            const searchTerm = searchWordInput.value.toLowerCase();
+            const wordItems = wordList.querySelectorAll('.word-list-item');
+            
+            wordItems.forEach(item => {
+                const word = item.querySelector('.word').textContent.toLowerCase();
+                if (word.includes(searchTerm)) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function renderWordList() {
+            wordList.innerHTML = '';
+            
+            if (filteredWords.length === 0) {
+                wordList.innerHTML = '<div class="text-center py-5"><p>No words to display. Apply filters or add words first.</p></div>';
+                return;
+            }
+            
+            filteredWords.forEach(word => {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'word-list-item';
+                wordItem.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="word">${word.word}</span>
+                            <span class="meaning ms-2">${word.meaning}</span>
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary toggle-details">Details</button>
+                            <button class="btn btn-sm btn-outline-secondary edit-word" data-word-id="${word.id}">Edit</button>
+                            <button class="btn btn-sm btn-outline-danger delete-word" data-word-id="${word.id}">Delete</button>
+                            <button class="btn btn-mark ${word.marked ? 'marked' : ''}" data-word-id="${word.id}">
+                                <i class="${word.marked ? 'fas' : 'far'} fa-star"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="details">
+                        ${word.sentence ? `<p><strong>Example:</strong> ${word.sentence}</p>` : ''}
+                        ${word.synonyms.length > 0 ? `
+                            <p><strong>Synonyms:</strong>
+                                <span class="synonym-antonym-list">
+                                    ${word.synonyms.map(syn => `<span class="synonym-item">${syn}</span>`).join(' ')}
+                                </span>
+                            </p>
+                        ` : ''}
+                        ${word.antonyms.length > 0 ? `
+                            <p><strong>Antonyms:</strong>
+                                <span class="synonym-antonym-list">
+                                    ${word.antonyms.map(ant => `<span class="antonym-item">${ant}</span>`).join(' ')}
+                                </span>
+                            </p>
+                        ` : ''}
+                    </div>
+                `;
+                wordList.appendChild(wordItem);
+                
+                // Add event listeners
+                const toggleBtn = wordItem.querySelector('.toggle-details');
+                const markBtn = wordItem.querySelector('.btn-mark');
+                const editBtn = wordItem.querySelector('.edit-word');
+                const deleteBtn = wordItem.querySelector('.delete-word');
+                
+                toggleBtn.addEventListener('click', () => {
+                    wordItem.classList.toggle('expanded');
+                    toggleBtn.textContent = wordItem.classList.contains('expanded') ? 'Hide' : 'Details';
+                });
+                
+                markBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleWordMark(word.id, markBtn);
+                });
+
+                editBtn.addEventListener('click', () => {
+                    editWord(word);
+                });
+
+                deleteBtn.addEventListener('click', () => {
+                    deleteWord(word.id);
+                });
+            });
+        }
+
+        async function deleteWord(wordId) {
+            if (confirm('Are you sure you want to delete this word?')) {
+                try {
+                    await db.collection('vocabulary').doc(wordId).delete();
+                    alert('Word deleted successfully!');
+                    loadWords(); // Refresh the word list
+                } catch (error) {
+                    console.error('Error deleting word:', error);
+                    alert('Failed to delete word. Please try again.');
+                }
+            }
+        }
+
+        function editWord(word) {
+            const wordInput = document.getElementById('word');
+            const meaningInput = document.getElementById('meaning');
+            const synonymsInput = document.getElementById('synonyms');
+            const antonymsInput = document.getElementById('antonyms');
+            const sentenceInput = document.getElementById('sentence');
+            const wrongOptionsInput = document.getElementById('wrongOptions');
+            const submitButton = manualWordForm.querySelector('button[type="submit"]');
+
+            // Populate the form with the word's data
+            wordInput.value = word.word;
+            meaningInput.value = word.meaning;
+            synonymsInput.value = word.synonyms.join(', ');
+            antonymsInput.value = word.antonyms.join(', ');
+            sentenceInput.value = word.sentence;
+            wrongOptionsInput.value = word.wrongOptions.join(', ');
+
+            // Change the button text to "Save"
+            submitButton.textContent = 'Save';
+
+            // Scroll to the form
+            document.getElementById('add-tab').click();
+
+            // Update the form submission to edit the word
+            manualWordForm.onsubmit = async (e) => {
+                e.preventDefault();
+
+                try {
+                    // Update the word in the database
+                    await updateWord(word.id, {
+                        word: wordInput.value.trim(),
+                        meaning: meaningInput.value.trim(),
+                        synonyms: synonymsInput.value.split(',').map(s => s.trim()).filter(s => s),
+                        antonyms: antonymsInput.value.split(',').map(a => a.trim()).filter(a => a),
+                        sentence: sentenceInput.value.trim(),
+                        wrongOptions: wrongOptionsInput.value.split(',').map(o => o.trim()).filter(o => o),
+                    });
+
+                    alert('Word updated successfully!');
+                    manualWordForm.reset();
+                    submitButton.textContent = 'Add Word'; // Reset the button text
+                    manualWordForm.onsubmit = addManualWord; // Reset the form submission handler
+                    loadWords(); // Refresh the word list
+                } catch (error) {
+                    console.error('Error updating word:', error);
+                    alert('Failed to update word. Please try again.');
+                }
+            };
+        }
+
+        function renderFlashcard() {
+            if (filteredWords.length === 0) {
+                flashcardFrontContent.textContent = 'No words to display';
+                flashcardBackContent.textContent = 'Apply filters or add words first';
+                flashcardCounter.textContent = '0/0';
+                return;
+            }
+            
+            const currentWord = filteredWords[currentFlashcardIndex];
+            
+            if (flashcardMode === 'word') {
+                flashcardFrontContent.innerHTML = `<div class="word-display">${currentWord.word}</div>`;
+                flashcardBackContent.innerHTML = `
+                    <div class="meaning-display"><strong>Meaning:</strong> ${currentWord.meaning}</div>
+                    ${currentWord.sentence ? `<div class="sentence-display"><strong>Example:</strong> ${currentWord.sentence}</div>` : ''}
+                    ${currentWord.synonyms.length > 0 ? `
+                        <div class="synonyms-display mt-2">
+                            <strong>Synonyms:</strong>
+                            <div class="synonym-antonym-list">
+                                ${currentWord.synonyms.map(syn => `<span class="synonym-item">${syn}</span>`).join(' ')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${currentWord.antonyms.length > 0 ? `
+                        <div class="antonyms-display mt-2">
+                            <strong>Antonyms:</strong>
+                            <div class="synonym-antonym-list">
+                                ${currentWord.antonyms.map(ant => `<span class="antonym-item">${ant}</span>`).join(' ')}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+            } else {
+                flashcardFrontContent.innerHTML = `<div class="meaning-display">${currentWord.meaning}</div>`;
+                flashcardBackContent.innerHTML = `
+                    <div class="word-display">${currentWord.word}</div>
+                    ${currentWord.sentence ? `<div class="sentence-display"><strong>Example:</strong> ${currentWord.sentence}</div>` : ''}
+                    ${currentWord.synonyms.length > 0 ? `
+                        <div class="synonyms-display mt-2">
+                            <strong>Synonyms:</strong>
+                            <div class="synonym-antonym-list">
+                                ${currentWord.synonyms.map(syn => `<span class="synonym-item">${syn}</span>`).join(' ')}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${currentWord.antonyms.length > 0 ? `
+                        <div class="antonyms-display mt-2">
+                            <strong>Antonyms:</strong>
+                            <div class="synonym-antonym-list">
+                                ${currentWord.antonyms.map(ant => `<span class="antonym-item">${ant}</span>`).join(' ')}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+            }
+            
+            // Update mark button
+            markCardBtn.className = `btn btn-mark ${currentWord.marked ? 'marked' : ''}`;
+            markCardBtn.innerHTML = `<i class="${currentWord.marked ? 'fas' : 'far'} fa-star"></i>`;
+            
+            // Update counter
+            flashcardCounter.textContent = `${currentFlashcardIndex + 1}/${filteredWords.length}`;
+            
+            // Reset card to front
+            if (flashcard.classList.contains('flipped')) {
+                flashcard.classList.remove('flipped');
+            }
+        }
+
+        function flipFlashcard() {
+            flashcard.classList.toggle('flipped');
+        }
+
+        function showPreviousFlashcard() {
+            if (filteredWords.length === 0) return;
+            currentFlashcardIndex = (currentFlashcardIndex - 1 + filteredWords.length) % filteredWords.length;
+            renderFlashcard();
+        }
+
+        function showNextFlashcard() {
+            if (filteredWords.length === 0) return;
+            currentFlashcardIndex = (currentFlashcardIndex + 1) % filteredWords.length;
+            renderFlashcard();
+        }
+
+        function setFlashcardMode(mode) {
+            flashcardMode = mode;
+            renderFlashcard();
+        }
+
+        function shuffleFlashcards() {
+            if (filteredWords.length === 0) return;
+            shuffleArray(filteredWords);
+            currentFlashcardIndex = 0;
+            renderFlashcard();
+        }
+
+        async function toggleWordMark(wordId, button = null) {
+            const wordIndex = words.findIndex(w => w.id === wordId);
+            if (wordIndex === -1) return;
+            
+            const newMarkedStatus = !words[wordIndex].marked;
+            words[wordIndex].marked = newMarkedStatus;
+            
+            try {
+                await updateWord(wordId, { marked: newMarkedStatus });
+                
+                if (button) {
+                    button.className = `btn btn-mark ${newMarkedStatus ? 'marked' : ''}`;
+                    button.innerHTML = `<i class="${newMarkedStatus ? 'fas' : 'far'} fa-star"></i>`;
+                }
+                
+                // Update flashcard mark button if this is the current word
+                if (reviewModeSelect.value === 'flashcard' && 
+                    filteredWords[currentFlashcardIndex]?.id === wordId) {
+                    markCardBtn.className = `btn btn-mark ${newMarkedStatus ? 'marked' : ''}`;
+                    markCardBtn.innerHTML = `<i class="${newMarkedStatus ? 'fas' : 'far'} fa-star"></i>`;
+                }
+            } catch (error) {
+                console.error('Error updating mark status:', error);
+                // Revert UI change
+                words[wordIndex].marked = !newMarkedStatus;
+                if (button) {
+                    button.className = `btn btn-mark ${!newMarkedStatus ? 'marked' : ''}`;
+                    button.innerHTML = `<i class="${!newMarkedStatus ? 'fas' : 'far'} fa-star"></i>`;
+                }
+            }
+        }
+
+        async function toggleMarkWord() {
+            if (filteredWords.length === 0) return;
+            const currentWord = filteredWords[currentFlashcardIndex];
+            await toggleWordMark(currentWord.id, markCardBtn);
+        }
+
+        // Test Functions
+        function toggleTestType() {
+            const testType = testTypeSelect.value;
+            meaningTestContainer.style.display = 'none';
+            synonymTestContainer.style.display = 'none';
+            matchingTestContainer.style.display = 'none';
+            
+            if (testType === 'meaning') {
+                meaningTestContainer.style.display = 'block';
+            } else if (testType === 'synonyms') {
+                synonymTestContainer.style.display = 'block';
+            } else if (testType === 'matching') {
+                matchingTestContainer.style.display = 'block';
+            }
+        }
+
+        function toggleTestRandomOptions() {
+            if (testTimeFilterSelect.value === 'random') {
+                testRandomOptionsContainer.style.display = 'block';
+            } else {
+                testRandomOptionsContainer.style.display = 'none';
+            }
+        }
+
+        function startTest() {
+            const testType = testTypeSelect.value;
+            const filter = testTimeFilterSelect.value;
+            const questionCount = parseInt(testQuestionCountInput.value) || 10;
+            
+            // Filter words based on selection
+            let testPool = [...words];
+            const now = new Date();
+            
+            if (filter === 'today') {
+                const today = new Date(now.setHours(0, 0, 0, 0));
+                testPool = testPool.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= today;
+                });
+            } else if (filter === 'yesterday') {
+                const yesterday = new Date(now);
+                yesterday.setDate(yesterday.getDate() - 1);
+                yesterday.setHours(0, 0, 0, 0);
+                const today = new Date(yesterday);
+                today.setDate(today.getDate() + 1);
+                testPool = testPool.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= yesterday && wordDate < today;
+                });
+            } else if (filter === 'this_week') {
+                const startOfWeek = new Date(now);
+                startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+                startOfWeek.setHours(0, 0, 0, 0);
+                testPool = testPool.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfWeek;
+                });
+            } else if (filter === 'last_week') {
+                const startOfLastWeek = new Date(now);
+                startOfLastWeek.setDate(startOfLastWeek.getDate() - startOfLastWeek.getDay() - 7);
+                startOfLastWeek.setHours(0, 0, 0, 0);
+                const endOfLastWeek = new Date(startOfLastWeek);
+                endOfLastWeek.setDate(endOfLastWeek.getDate() + 7);
+                testPool = testPool.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfLastWeek && wordDate < endOfLastWeek;
+                });
+            } else if (filter === 'last_month') {
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                testPool = testPool.filter(word => {
+                    const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                    return wordDate >= startOfMonth && wordDate < new Date(now.getFullYear(), now.getMonth(), 1);
+                });
+            } else if (filter === 'most_wrong') {
+                testPool.sort((a, b) => {
+                    const aWrong = a.testHistory.filter(r => !r.correct).length;
+                    const bWrong = b.testHistory.filter(r => !r.correct).length;
+                    return bWrong - aWrong;
+                });
+            } else if (filter === 'marked') {
+                testPool = testPool.filter(word => word.marked);
+            } else if (filter === 'random') {
+                const randomOption = testRandomOptionsSelect.value;
+                if (!isNaN(randomOption)) {
+                    // Number of words selected
+                    shuffleArray(testPool);
+                    testPool = testPool.slice(0, parseInt(randomOption));
+                } else {
+                    // Time period selected
+                    const daysAgo = parseInt(randomOption.replace('days', '')) || 1;
+                    const startDate = new Date(now);
+                    startDate.setDate(startDate.getDate() - daysAgo);
+                    startDate.setHours(0, 0, 0, 0);
+                    const endDate = new Date(startDate);
+                    endDate.setDate(endDate.getDate() + 1);
+                    testPool = testPool.filter(word => {
+                        const wordDate = word.createdAt.toDate ? word.createdAt.toDate() : new Date(word.createdAt);
+                        return wordDate >= startDate && wordDate < endDate;
+                    });
+                    shuffleArray(testPool);
+                }
+            }
+            
+            // Further filter based on test type requirements
+            if (testType === 'meaning') {
+                testPool = testPool.filter(word => word.wrongOptions.length >= 3);
+            } else if (testType === 'synonyms') {
+                testPool = testPool.filter(word => word.synonyms.length >= 1);
+            }
+            
+            // Limit to available words
+            testWords = testPool.slice(0, Math.min(questionCount, testPool.length));
+            shuffleArray(testWords);
+            
+            currentTestIndex = 0;
+            testScore = 0;
+            testResults = [];
+            testResultsContainer.style.display = 'none';
+            
+            if (testWords.length === 0) {
+                alert('No words available for the selected test type and filters.');
+                return;
+            }
+            
+            if (testType === 'meaning') {
+                renderMeaningQuestion();
+            } else if (testType === 'synonyms') {
+                renderSynonymQuestion();
+            } else if (testType === 'matching') {
+                setupMatchingGame();
+            }
+        }
+
+        function renderMeaningQuestion() {
+            if (currentTestIndex >= testWords.length) {
+                showTestResults();
+                return;
+            }
+            
+            const currentWord = testWords[currentTestIndex];
+            const meaningQuestion = document.getElementById('meaningQuestion');
+            const meaningOptions = document.getElementById('meaningOptions');
+            const testProgress = document.getElementById('testProgress');
+            
+            meaningQuestion.textContent = `What word means "${currentWord.meaning}"?`;
+            testProgress.textContent = `${currentTestIndex + 1}/${testWords.length}`;
+            
+            // Prepare options
+            const options = [currentWord.word, ...currentWord.wrongOptions];
+            shuffleArray(options);
+            
+            meaningOptions.innerHTML = '';
+            options.forEach((option, index) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'quiz-option';
+                optionDiv.textContent = option;
+                optionDiv.addEventListener('click', () => checkMeaningAnswer(option, currentWord.word));
+                meaningOptions.appendChild(optionDiv);
+            });
+            
+            document.getElementById('meaningFeedback').style.display = 'none';
+        }
+
+        function checkMeaningAnswer(selectedOption, correctAnswer) {
+            const isCorrect = selectedOption === correctAnswer;
+            const options = document.querySelectorAll('#meaningOptions .quiz-option');
+            
+            options.forEach(option => {
+                option.classList.remove('correct', 'incorrect');
+                if (option.textContent === correctAnswer) {
+                    option.classList.add('correct');
+                } else if (option.textContent === selectedOption && !isCorrect) {
+                    option.classList.add('incorrect');
+                }
+            });
+            
+            // Record result
+            testResults.push({
+                word: correctAnswer,
+                question: `What word means "${testWords[currentTestIndex].meaning}"?`,
+                selectedAnswer: selectedOption,
+                correctAnswer: correctAnswer,
+                correct: isCorrect
+            });
+            
+            if (isCorrect) {
+                testScore++;
+            }
+            
+            const feedback = document.getElementById('meaningFeedback');
+            const correctAnswerFeedback = document.getElementById('correctAnswerFeedback');
+            
+            if (isCorrect) {
+                correctAnswerFeedback.textContent = 'Correct! Well done.';
+            } else {
+                correctAnswerFeedback.textContent = `Incorrect. The correct answer is "${correctAnswer}".`;
+            }
+            
+            feedback.style.display = 'block';
+            
+            // Set up next question button
+            const nextBtn = document.getElementById('nextMeaningQuestion');
+            nextBtn.onclick = () => {
+                currentTestIndex++;
+                renderMeaningQuestion();
+            };
+        }
+
+        function renderSynonymQuestion() {
+            if (currentTestIndex >= testWords.length) {
+                showTestResults();
+                return;
+            }
+            
+            const currentWord = testWords[currentTestIndex];
+            const synonymQuestion = document.getElementById('synonymQuestion');
+            const synonymOptions = document.getElementById('synonymOptions');
+            const synonymTestProgress = document.getElementById('synonymTestProgress');
+            
+            synonymQuestion.textContent = `Which word is a synonym of "${currentWord.word}"?`;
+            synonymTestProgress.textContent = `${currentTestIndex + 1}/${testWords.length}`;
+            
+            // Prepare options - need at least 1 synonym and 3 wrong options
+            const synonyms = currentWord.synonyms;
+            const wrongOptions = currentWord.wrongOptions.length >= 3 ? 
+                currentWord.wrongOptions.slice(0, 3) : 
+                getRandomWrongOptions(currentWord.word, 3);
+            
+            // Select one synonym randomly
+            const correctSynonym = synonyms[Math.floor(Math.random() * synonyms.length)];
+            const options = [correctSynonym, ...wrongOptions];
+            shuffleArray(options);
+            
+            synonymOptions.innerHTML = '';
+            options.forEach((option, index) => {
+                const optionDiv = document.createElement('div');
+                optionDiv.className = 'quiz-option';
+                optionDiv.textContent = option;
+                optionDiv.addEventListener('click', () => checkSynonymAnswer(option, correctSynonym, currentWord.word));
+                synonymOptions.appendChild(optionDiv);
+            });
+            
+            document.getElementById('synonymFeedback').style.display = 'none';
+        }
+
+        function checkSynonymAnswer(selectedOption, correctAnswer, originalWord) {
+            const isCorrect = selectedOption === correctAnswer;
+            const options = document.querySelectorAll('#synonymOptions .quiz-option');
+            
+            options.forEach(option => {
+                option.classList.remove('correct', 'incorrect');
+                if (option.textContent === correctAnswer) {
+                    option.classList.add('correct');
+                } else if (option.textContent === selectedOption && !isCorrect) {
+                    option.classList.add('incorrect');
+                }
+            });
+            
+            // Record result
+            testResults.push({
+                word: originalWord,
+                question: `Which word is a synonym of "${originalWord}"?`,
+                selectedAnswer: selectedOption,
+                correctAnswer: correctAnswer,
+                correct: isCorrect
+            });
+            
+            if (isCorrect) {
+                testScore++;
+            }
+            
+            const feedback = document.getElementById('synonymFeedback');
+            const synonymAnswerFeedback = document.getElementById('synonymAnswerFeedback');
+            
+            if (isCorrect) {
+                synonymAnswerFeedback.textContent = 'Correct! Well done.';
+            } else {
+                synonymAnswerFeedback.textContent = `Incorrect. A correct synonym is "${correctAnswer}".`;
+            }
+            
+            feedback.style.display = 'block';
+            
+            // Set up next question button
+            const nextBtn = document.getElementById('nextSynonymQuestion');
+            nextBtn.onclick = () => {
+                currentTestIndex++;
+                renderSynonymQuestion();
+            };
+        }
+
+        function setupMatchingGame() {
+            if (testWords.length < 4) {
+                alert('Need at least 4 words for matching game.');
+                return;
+            }
+            
+            // Use first 8 words or as many as available
+            const gameWords = testWords.slice(0, Math.min(8, testWords.length));
+            shuffleArray(gameWords);
+            
+            // Create pairs
+            matchingPairs = gameWords.map(word => ({
+                word: word.word,
+                meaning: word.meaning
+            }));
+            
+            // Split into two columns
+            const column1 = document.getElementById('matchingColumn1');
+            const column2 = document.getElementById('matchingColumn2');
+            column1.innerHTML = '';
+            column2.innerHTML = '';
+            
+            // Shuffle words and meanings separately
+            const shuffledWords = [...matchingPairs].sort(() => Math.random() - 0.5);
+            const shuffledMeanings = [...matchingPairs].sort(() => Math.random() - 0.5);
+            
+            shuffledWords.forEach((pair, index) => {
+                const wordItem = document.createElement('div');
+                wordItem.className = 'matching-item';
+                wordItem.textContent = pair.word;
+                wordItem.dataset.word = pair.word;
+                wordItem.addEventListener('click', () => selectMatchingItem(wordItem, 'word'));
+                column1.appendChild(wordItem);
+            });
+            
+            shuffledMeanings.forEach((pair, index) => {
+                const meaningItem = document.createElement('div');
+                meaningItem.className = 'matching-item';
+                meaningItem.textContent = pair.meaning;
+                meaningItem.dataset.word = pair.word;
+                meaningItem.addEventListener('click', () => selectMatchingItem(meaningItem, 'meaning'));
+                column2.appendChild(meaningItem);
+            });
+            
+            document.getElementById('matchingProgress').textContent = '0 pairs matched';
+            document.getElementById('checkMatching').disabled = true;
+            selectedMatch = null;
+        }
+
+        function selectMatchingItem(item, type) {
+            // Ignore if already matched
+            if (item.classList.contains('matched')) return;
+            
+            // Clear previous selection of the same type
+            const items = document.querySelectorAll(`#matchingColumn${type === 'word' ? 1 : 2} .matching-item`);
+            items.forEach(i => i.classList.remove('selected'));
+            
+            // Select this item
+            item.classList.add('selected');
+            
+            if (selectedMatch) {
+                // Check if this is the other half of the pair
+                if ((type === 'word' && selectedMatch.type === 'meaning') || 
+                    (type === 'meaning' && selectedMatch.type === 'word')) {
+                    
+                    if (item.dataset.word === selectedMatch.item.dataset.word) {
+                        // Correct match
+                        item.classList.add('matched');
+                        selectedMatch.item.classList.add('matched');
+                        document.getElementById('matchingProgress').textContent = 
+                            `${document.querySelectorAll('.matching-item.matched').length / 2} pairs matched`;
+                    }
+                }
+                
+                selectedMatch = null;
+                document.getElementById('checkMatching').disabled = true;
+            } else {
+                // First selection
+                selectedMatch = { item, type };
+                document.getElementById('checkMatching').disabled = false;
+            }
+        }
+
+        function checkMatchingAnswers() {
+            const matchedPairs = document.querySelectorAll('.matching-item.matched').length / 2;
+            const totalPairs = matchingPairs.length;
+            const score = matchedPairs;
+            
+            // Record results
+            testResults.push({
+                word: 'Matching Game',
+                question: 'Match words with their meanings',
+                selectedAnswer: `${matchedPairs} correct matches`,
+                correctAnswer: `${totalPairs} possible matches`,
+                correct: matchedPairs === totalPairs
+            });
+            
+            testScore += score;
+            showTestResults();
+        }
+
+        function showTestResults() {
+            testResultsContainer.style.display = 'block';
+            meaningTestContainer.style.display = 'none';
+            synonymTestContainer.style.display = 'none';
+            matchingTestContainer.style.display = 'none';
+            
+            document.getElementById('testScore').textContent = testScore;
+            document.getElementById('totalQuestions').textContent = testWords.length;
+            
+            const testReview = document.getElementById('testReview');
+            testReview.innerHTML = '';
+            
+            testResults.forEach(result => {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `mb-3 p-3 ${result.correct ? 'bg-light' : 'bg-danger bg-opacity-10'}`;
+                resultDiv.innerHTML = `
+                    <p><strong>Question:</strong> ${result.question}</p>
+                    <p><strong>Your answer:</strong> ${result.selectedAnswer}</p>
+                    ${!result.correct ? `<p><strong>Correct answer:</strong> ${result.correctAnswer}</p>` : ''}
+                `;
+                testReview.appendChild(resultDiv);
+            });
+            
+            // Update test history for words
+            updateTestHistory();
+        }
+
+        async function updateTestHistory() {
+            const testType = testTypeSelect.value;
+            const now = new Date();
+            
+            for (const result of testResults) {
+                if (result.word === 'Matching Game') continue;
+                
+                const wordIndex = words.findIndex(w => w.word === result.word);
+                if (wordIndex === -1) continue;
+                
+                const word = words[wordIndex];
+                const testEntry = {
+                    type: testType,
+                    correct: result.correct,
+                    date: now
+                };
+                
+                word.testHistory.push(testEntry);
+                
+                try {
+                    await updateWord(word.id, { 
+                        testHistory: firebase.firestore.FieldValue.arrayUnion(testEntry) 
+                    });
+                } catch (error) {
+                    console.error('Error updating test history:', error);
+                }
+            }
+        }
+
+        function getRandomWrongOptions(correctWord, count) {
+            const otherWords = words.filter(w => w.word !== correctWord);
+            shuffleArray(otherWords);
+            return otherWords.slice(0, count).map(w => w.word);
+        }
+
+        // Form Handlers
+        async function addManualWord(e) {
+            e.preventDefault();
+            
+            const word = document.getElementById('word').value.trim();
+            const meaning = document.getElementById('meaning').value.trim();
+            const synonyms = document.getElementById('synonyms').value.split(',').map(s => s.trim()).filter(s => s);
+            const antonyms = document.getElementById('antonyms').value.split(',').map(a => a.trim()).filter(a => a);
+            const sentence = document.getElementById('sentence').value.trim();
+            const wrongOptions = document.getElementById('wrongOptions').value.split(',').map(o => o.trim()).filter(o => o);
+            
+            if (!word) {
+                alert('Word is required');
+                return;
+            }
+            
+            try {
+                const wordData = {
+                    word,
+                    meaning,
+                    synonyms,
+                    antonyms,
+                    sentence,
+                    wrongOptions
+                };
+                
+                await addWord(wordData);
+                alert('Word added successfully!');
+                manualWordForm.reset();
+                loadWords(); // Refresh the word list
+            } catch (error) {
+                console.error('Error adding word:', error);
+                alert('Failed to add word. Please try again.');
+            }
+        }
+
+        async function importJsonWords(e) {
+            e.preventDefault();
+            
+            const jsonData = document.getElementById('jsonData').value.trim();
+            
+            if (!jsonData) {
+                alert('JSON data is required');
+                return;
+            }
+            
+            try {
+                const data = JSON.parse(jsonData);
+                let wordsToAdd = Array.isArray(data) ? data : [data];
+                let successCount = 0;
+                
+                for (const wordData of wordsToAdd) {
+                    if (!wordData.word) continue;
+                    
+                    try {
+                        await addWord({
+                            word: wordData.word,
+                            meaning: wordData.meaning || '',
+                            synonyms: wordData.synonyms || [],
+                            antonyms: wordData.antonyms || [],
+                            sentence: wordData.sentence || '',
+                            wrongOptions: wordData.wrongOptions || []
+                        });
+                        successCount++;
+                    } catch (error) {
+                        console.error(`Error adding word ${wordData.word}:`, error);
+                    }
+                }
+                
+                alert(`Successfully imported ${successCount} word(s)`);
+                jsonWordForm.reset();
+                loadWords(); // Refresh the word list
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+                alert('Invalid JSON format. Please check your data.');
+            }
+        }
+
+        // Utility Functions
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+    </script>
+</body>
+</html>
